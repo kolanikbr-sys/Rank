@@ -1,40 +1,553 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+--[[
+Rank - ESP Script + System Key + Advanced ESP Info + Automation Tab + Huge Tab + Viz Tab + Fun Tab + Utilidades Tab
+Key obrigatória: "rankgui"
+Logo customizada
 
-local Window = Rayfield:CreateWindow({
-   Name = "rank",
-   Icon = 0,
-   LoadingTitle = "Rayfield Interface Suite",
-   LoadingSubtitle = "by Sirius",
-   ShowText = "Rayfield",
-   Theme = "Default",
-   ToggleUIKeybind = "K",
-   DisableRayfieldPrompts = false,
-   DisableBuildWarnings = false,
-   ConfigurationSaving = {
-      Enabled = true,
-      FolderName = nil,
-      FileName = "Big Hub"
-   },
-   Discord = {
-      Enabled = false,
-      Invite = "noinvitelink",
-      RememberJoins = true
-   },
-   KeySystem = false,
-   KeySettings = {
-      Title = "Untitled",
-      Subtitle = "Key System",
-      Note = "No method of obtaining the key is provided",
-      FileName = "Key",
-      SaveKey = true,
-      GrabKeyFromSite = false,
-      Key = {"Hello"}
-   }
+Funções principais:
+- ESP highlight vermelho (toggle)
+- ESP informativo: nome, vida, distância, tempo (toggle)
+- Teletransporte simples para jogador
+- Teletransporte contínuo (loop)
+- Huge Tab: ganha uma AK-47 overpower que mata qualquer player com um clique
+- Viz Tab: deslizador para ajustar velocidade do player até 500
+- Fun Tab: 20 funções de troll/diversão
+- Utilidades Tab: 20 funções úteis/automatizadas
+]]
+
+local Luna = loadstring(game:HttpGet("https://raw.githubusercontent.com/Nebula-Softworks/Luna-Interface-Suite/refs/heads/master/source.lua", true))()
+
+local Window = Luna:CreateWindow({
+    Name = "Rank",
+    Subtitle = "ESP Avançado",
+    LogoID = "16408304458",
+    LoadingEnabled = true,
+    LoadingTitle = "Rank",
+    LoadingSubtitle = "Rank exploits",
+    ConfigSettings = {
+        RootFolder = nil,
+        ConfigFolder = "LunaESPExample"
+    },
+    KeySystem = true,
+    KeySettings = {
+        Title = "Rank Key",
+        Subtitle = "Sistema de Key",
+        Note = "Digite a key correta para acessar o script.",
+        SaveInRoot = false,
+        SaveKey = true,
+        Key = {"rankgui"},
+        SecondAction = {
+            Enabled = false,
+            Type = "Link",
+            Parameter = ""
+        }
+    }
 })
 
-local VisualTab = Window:CreateTab("Visual", 0)
-local Section = VisualTab:CreateSection("ESP/Highlights")
+-- SERVIÇOS E VARIAVEIS GLOBAIS
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local StarterGui = game:GetService("StarterGui")
+local highlights = {}
+local espGui = {}
+local ESPWalkSpeed = 16
+local highlightsEnabled = false
+local infoESPEnabled = false
 
+local function getCharacterRoot(character)
+    return character and (character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")) or nil
+end
+
+local function enableHighlightESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local character = player.Character
+            if character and not highlights[player] then
+                local highlight = Instance.new("Highlight")
+                highlight.Adornee = character
+                highlight.FillColor = Color3.new(1, 0, 0)
+                highlight.OutlineColor = Color3.new(1, 0, 0)
+                highlight.FillTransparency = 0.5
+                highlight.OutlineTransparency = 0
+                highlight.Parent = game:GetService("CoreGui")
+                highlights[player] = highlight
+            end
+        end
+    end
+end
+
+local function disableHighlightESP()
+    for player, highlight in pairs(highlights) do
+        if highlight then highlight:Destroy() end
+    end
+    highlights = {}
+end
+
+local function createBillboard(player)
+    if espGui[player] then return end
+    local character = player.Character
+    if not character then return end
+    local root = getCharacterRoot(character)
+    local head = character:FindFirstChild("Head")
+    if not root or not head then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "RankESPInfo"
+    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.new(0, 200, 0, 70)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.Adornee = head
+    billboard.Parent = game:GetService("CoreGui")
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "PlayerName"
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Size = UDim2.new(1, 0, 0, 20)
+    nameLabel.Position = UDim2.new(0, 0, 0, 0)
+    nameLabel.TextColor3 = Color3.new(1, 1, 1)
+    nameLabel.TextStrokeTransparency = 0.7
+    nameLabel.TextStrokeColor3 = Color3.new(0,0,0)
+    nameLabel.Font = Enum.Font.SourceSansBold
+    nameLabel.TextScaled = true
+    nameLabel.Text = player.Name
+    nameLabel.Parent = billboard
+    local healthLabel = Instance.new("TextLabel")
+    healthLabel.Name = "PlayerHealth"
+    healthLabel.BackgroundTransparency = 1
+    healthLabel.Size = UDim2.new(1, 0, 0, 20)
+    healthLabel.Position = UDim2.new(0, 0, 0, 20)
+    healthLabel.TextColor3 = Color3.new(1, 0.3, 0.3)
+    healthLabel.TextStrokeTransparency = 0.7
+    healthLabel.Font = Enum.Font.SourceSans
+    healthLabel.TextScaled = true
+    healthLabel.Text = "Vida: --"
+    healthLabel.Parent = billboard
+    local distanceLabel = Instance.new("TextLabel")
+    distanceLabel.Name = "PlayerDistance"
+    distanceLabel.BackgroundTransparency = 1
+    distanceLabel.Size = UDim2.new(1, 0, 0, 15)
+    distanceLabel.Position = UDim2.new(0, 0, 0, 40)
+    distanceLabel.TextColor3 = Color3.new(0.5, 0.8, 1)
+    distanceLabel.TextStrokeTransparency = 0.7
+    distanceLabel.Font = Enum.Font.SourceSans
+    distanceLabel.TextScaled = true
+    distanceLabel.Text = "Distância: --"
+    distanceLabel.Parent = billboard
+    local timeLabel = Instance.new("TextLabel")
+    timeLabel.Name = "PlayerTime"
+    timeLabel.BackgroundTransparency = 1
+    timeLabel.Size = UDim2.new(1, 0, 0, 15)
+    timeLabel.Position = UDim2.new(0, 0, 0, 55)
+    timeLabel.TextColor3 = Color3.new(1, 1, 0.4)
+    timeLabel.TextStrokeTransparency = 0.7
+    timeLabel.Font = Enum.Font.SourceSans
+    timeLabel.TextScaled = true
+    timeLabel.Text = "Tempo: --"
+    timeLabel.Parent = billboard
+    espGui[player] = billboard
+end
+
+local function removeBillboard(player)
+    if espGui[player] then
+        espGui[player]:Destroy()
+        espGui[player] = nil
+    end
+end
+
+local function updateESPInfo()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and infoESPEnabled and player.Character then
+            local character = player.Character
+            local root = getCharacterRoot(character)
+            local head = character:FindFirstChild("Head")
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if root and head and humanoid then
+                if not espGui[player] then
+                    createBillboard(player)
+                end
+                local gui = espGui[player]
+                if gui then
+                    gui.Adornee = head
+                    local health = math.floor(humanoid.Health)
+                    gui.PlayerHealth.Text = string.format("Vida: %d", health)
+                    local myRoot = LocalPlayer.Character and getCharacterRoot(LocalPlayer.Character)
+                    if myRoot then
+                        local dist = (root.Position - myRoot.Position).Magnitude
+                        gui.PlayerDistance.Text = string.format("Distância: %d", dist)
+                        local time = dist / ESPWalkSpeed
+                        gui.PlayerTime.Text = string.format("Tempo: %.1fs", time)
+                    else
+                        gui.PlayerDistance.Text = "Distância: --"
+                        gui.PlayerTime.Text = "Tempo: --"
+                    end
+                end
+            else
+                removeBillboard(player)
+            end
+        else
+            removeBillboard(player)
+        end
+    end
+end
+
+local function onCharacterAdded(character)
+    if highlightsEnabled then
+        local player = Players:GetPlayerFromCharacter(character)
+        if player and player ~= LocalPlayer then
+            task.wait(0.5)
+            enableHighlightESP()
+        end
+    end
+end
+
+local function onPlayerAdded(player)
+    player.CharacterAdded:Connect(onCharacterAdded)
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        player.CharacterAdded:Connect(onCharacterAdded)
+    end
+end
+Players.PlayerAdded:Connect(onPlayerAdded)
+Players.PlayerRemoving:Connect(function(player)
+    disableHighlightESP()
+    removeBillboard(player)
+end)
+
+RunService.RenderStepped:Connect(function()
+    if highlightsEnabled then
+        enableHighlightESP()
+    end
+    if infoESPEnabled then
+        updateESPInfo()
+    else
+        for _, player in ipairs(Players:GetPlayers()) do
+            removeBillboard(player)
+        end
+    end
+end)
+
+-- VISUAL TAB
+local VisualTab = Window:CreateTab({
+    Name = "👁️ Visual",
+    Icon = "visibility",
+    ImageSource = "Material",
+    ShowTitle = true
+})
+VisualTab:CreateSection("Visualização ESP")
+VisualTab:CreateParagraph({
+    Title = "Como usar o ESP",
+    Text = "Ative um ou ambos os ESPs abaixo para destacar ou monitorar outros jogadores no mapa. Combine para uma experiência completa!"
+})
+VisualTab:CreateToggle({
+    Name = "ESP Highlight (Vermelho)",
+    Description = "Contorno vermelho em todos jogadores.",
+    CurrentValue = false,
+    Callback = function(value)
+        highlightsEnabled = value
+        if value then enableHighlightESP() else disableHighlightESP() end
+    end
+}, "ESPHighlight")
+VisualTab:CreateToggle({
+    Name = "ESP Informativo (Nome/Vida/Distância/Tempo)",
+    Description = "Mostra nome, vida, distância e tempo acima da cabeça do player.",
+    CurrentValue = false,
+    Callback = function(value)
+        infoESPEnabled = value
+    end
+}, "InfoESP")
+VisualTab:CreateDivider()
+VisualTab:CreateSection("Dicas")
+VisualTab:CreateLabel({
+    Text = "Ative ambos para ESP super completo!",
+    Style = 2
+})
+VisualTab:CreateLabel({
+    Text = "Se o ESP não aparecer, certifique-se que seu personagem já está carregado.",
+    Style = 3
+})
+VisualTab:CreateDivider()
+VisualTab:CreateParagraph({
+    Title = "Sobre",
+    Text = "Desenvolvido por Rank exploits. Suporte: github.com/Nebula-Softworks/Luna-Interface-Suite"
+})
+
+-- VIZ TAB (SPEED)
+local VizTab = Window:CreateTab({
+    Name = "⚡ Viz",
+    Icon = "run_circle",
+    ImageSource = "Material",
+    ShowTitle = true
+})
+VizTab:CreateSection("Velocidade do Jogador")
+VizTab:CreateParagraph({
+    Title = "Ajuste de Velocidade",
+    Text = "Use o deslizador abaixo para escolher sua velocidade de corrida. (Padrão: 16, Máximo: 500)"
+})
+VizTab:CreateSlider({
+    Name = "Velocidade do Jogador",
+    Description = "Deslize para alterar sua velocidade.",
+    Range = {16, 500},
+    Increment = 1,
+    CurrentValue = 16,
+    Callback = function(value)
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = value
+            Luna:Notification({
+                Title = "Velocidade Alterada",
+                Icon = "directions_run",
+                ImageSource = "Material",
+                Content = "Sua velocidade agora é: " .. tostring(value)
+            })
+        end
+    end
+}, "SpeedSlider")
+VizTab:CreateDivider()
+VizTab:CreateLabel({
+    Text = "Use com responsabilidade! Velocidades altas podem causar kick em alguns jogos.",
+    Style = 3
+})
+
+-- AUTOMATION TAB (TELEPORTES)
+local AutomationTab = Window:CreateTab({
+    Name = "🤖 Automação",
+    Icon = "auto_awesome",
+    ImageSource = "Material",
+    ShowTitle = true
+})
+AutomationTab:CreateSection("Teletransporte para Jogador")
+AutomationTab:CreateParagraph({
+    Title = "Como usar",
+    Text = "Digite o nome ou @ do jogador abaixo e use os botões para teletransportar-se até ele, uma vez ou em loop."
+})
+
+local teleportInput
+local teleportTargetName = nil
+local teleportLoopActive = false
+local teleportLoopConnection = nil
+
+teleportInput = AutomationTab:CreateInput({
+    Name = "Nome do Jogador",
+    Description = "Digite o nome do jogador ou @ para teletransportar.",
+    PlaceholderText = "Exemplo: kolanikbr ou @kolanikbr",
+    CurrentValue = "",
+    Numeric = false,
+    MaxCharacters = 32,
+    Enter = false,
+    Callback = function(text)
+        teleportTargetName = tostring(text or ""):gsub("^@", ""):lower()
+    end
+}, "TeleportInput")
+local function findPlayerByName(name)
+    if not name or name == "" then return nil end
+    name = tostring(name):gsub("^@", ""):lower()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Name:lower() == name then
+            return p
+        end
+    end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.DisplayName and p.DisplayName:lower() == name then
+            return p
+        end
+    end
+    return nil
+end
+AutomationTab:CreateButton({
+    Name = "Teletransportar",
+    Description = "Teletransporta você para o jogador informado acima.",
+    Callback = function()
+        local playerNameRaw = teleportInput.CurrentValue
+        local playerName = tostring(playerNameRaw or ""):gsub("^@", ""):lower()
+        teleportTargetName = playerName
+        if not playerName or playerName == "" then
+            Luna:Notification({
+                Title = "Erro",
+                Icon = "report_gmailerrorred",
+                ImageSource = "Material",
+                Content = "Digite o nome do jogador!"
+            })
+            return
+        end
+        local target = findPlayerByName(playerName)
+        if target and target.Character then
+            local myChar = LocalPlayer.Character
+            local myRoot = myChar and getCharacterRoot(myChar)
+            local targetRoot = getCharacterRoot(target.Character)
+            if myRoot and targetRoot then
+                myRoot.CFrame = targetRoot.CFrame + Vector3.new(0, 2, 0)
+                Luna:Notification({
+                    Title = "Teletransporte",
+                    Icon = "flight_takeoff",
+                    ImageSource = "Material",
+                    Content = "Teletransportado para " .. target.Name
+                })
+            else
+                Luna:Notification({
+                    Title = "Erro",
+                    Icon = "report_gmailerrorred",
+                    ImageSource = "Material",
+                    Content = "Não foi possível teletransportar: personagem ou posição inválida."
+                })
+            end
+        else
+            Luna:Notification({
+                Title = "Erro",
+                Icon = "report_gmailerrorred",
+                ImageSource = "Material",
+                Content = "Jogador não encontrado ou sem personagem."
+            })
+        end
+    end
+})
+AutomationTab:CreateToggle({
+    Name = "Teletransporte Contínuo (Loop)",
+    Description = "Teleporta para o último nome digitado repetidamente, enquanto ativado.",
+    CurrentValue = false,
+    Callback = function(enabled)
+        teleportLoopActive = enabled
+        if teleportLoopConnection then
+            teleportLoopConnection:Disconnect()
+            teleportLoopConnection = nil
+        end
+        if enabled then
+            teleportLoopConnection = RunService.RenderStepped:Connect(function()
+                local targetName = teleportTargetName or (teleportInput and teleportInput.CurrentValue) or ""
+                if not targetName or targetName == "" then return end
+                local target = findPlayerByName(targetName)
+                if target and target.Character then
+                    local myChar = LocalPlayer.Character
+                    local myRoot = myChar and getCharacterRoot(myChar)
+                    local targetRoot = getCharacterRoot(target.Character)
+                    if myRoot and targetRoot then
+                        myRoot.CFrame = targetRoot.CFrame + Vector3.new(0, 2, 0)
+                    end
+                end
+            end)
+            Luna:Notification({
+                Title = "Loop Ativado",
+                Icon = "loop",
+                ImageSource = "Material",
+                Content = "Teletransporte contínuo ativado para [" .. (teleportTargetName or "N/A") .. "]"
+            })
+        else
+            Luna:Notification({
+                Title = "Loop Desativado",
+                Icon = "loop",
+                ImageSource = "Material",
+                Content = "Teletransporte contínuo desativado."
+            })
+        end
+    end
+}, "TeleportLoopToggle")
+AutomationTab:CreateDivider()
+AutomationTab:CreateLabel({
+    Text = "Use o loop com cautela para evitar bugs ou travamentos.",
+    Style = 3
+})
+
+-- HUGE TAB
+local HugeTab = Window:CreateTab({
+    Name = "💥 Huge",
+    Icon = "bolt",
+    ImageSource = "Material",
+    ShowTitle = true
+})
+HugeTab:CreateSection("Arma Especial")
+HugeTab:CreateParagraph({
+    Title = "AK-47 Overpower",
+    Text = "Clique no botão para receber uma AK-47 overpower que elimina qualquer jogador com um clique."
+})
+HugeTab:CreateButton({
+    Name = "Receber AK-47 Overpower",
+    Description = "Clique para receber uma AK-47 no seu inventário. Atire para eliminar qualquer jogador facilmente.",
+    Callback = function()
+        local backpack = LocalPlayer:FindFirstChild("Backpack")
+        if not backpack then
+            Luna:Notification({
+                Title = "Erro",
+                Icon = "report_gmailerrorred",
+                ImageSource = "Material",
+                Content = "Backpack não encontrado."
+            })
+            return
+        end
+        if backpack:FindFirstChild("AK-47 (Huge)") then
+            Luna:Notification({
+                Title = "Aviso",
+                Icon = "warning",
+                ImageSource = "Material",
+                Content = "Você já possui a AK-47!"
+            })
+            return
+        end
+        local tool = Instance.new("Tool")
+        tool.Name = "AK-47 (Huge)"
+        tool.RequiresHandle = false
+        tool.CanBeDropped = true
+        local shootSound = Instance.new("Sound")
+        shootSound.SoundId = "rbxassetid://138087017"
+        shootSound.Volume = 1
+        shootSound.Name = "ShootSound"
+        shootSound.Parent = tool
+        tool.Activated:Connect(function()
+            local mouse = LocalPlayer:GetMouse()
+            shootSound:Play()
+            local origin = workspace.CurrentCamera.CFrame.Position
+            local direction = (mouse.Hit.p - origin).Unit * 500
+            local params = RaycastParams.new()
+            params.IgnoreWater = true
+            params.FilterDescendantsInstances = {LocalPlayer.Character}
+            local result = workspace:Raycast(origin, direction, params)
+            if result and result.Instance then
+                local hitPart = result.Instance
+                local char = hitPart:FindFirstAncestorOfClass("Model")
+                if char and char ~= LocalPlayer.Character then
+                    local humanoid = char:FindFirstChildOfClass("Humanoid")
+                    if humanoid and humanoid.Health > 0 then
+                        humanoid.Health = 0
+                        Luna:Notification({
+                            Title = "AK-47 (Huge)",
+                            Icon = "bolt",
+                            ImageSource = "Material",
+                            Content = "Jogador eliminado: " .. (char.Name or "?")
+                        })
+                    end
+                end
+            end
+        end)
+        tool.Parent = backpack
+        Luna:Notification({
+            Title = "AK-47 Recebida!",
+            Icon = "military_tech",
+            ImageSource = "Material",
+            Content = "Você agora possui uma AK-47 Overpower no seu inventário!"
+        })
+    end
+})
+HugeTab:CreateDivider()
+HugeTab:CreateLabel({
+    Text = "Use a arma com responsabilidade! Apenas para fins de diversão/testes.",
+    Style = 3
+})
+
+-- ==== FUN TAB (20 funções divertidas, trollagens e efeitos) ====
+local FunTab = Window:CreateTab({
+    Name = "🎉 Fun",
+    Icon = "celebration",
+    ImageSource = "Material",
+    ShowTitle = true
+})
+FunTab:CreateSection("Diversão e Trollagens")
+FunTab:CreateParagraph({
+    Title = "Funções para brincar, trollar e impressionar seus amigos!"
+})
+FunTab:CreateButton({Name="Girar", Description="Gira seu personagem rapidamente.", Callback=function()
+    local root = getCharacterRoot(LocalPlayer.Character)
+    if root then for i=1,30 do root.CFrame = root.CFrame * CFrame.Angles(0,math.pi/4,0) wait() end end
+end})
+FunTab:CreateButton({Name="Explosão Visual", Description="Cria efeito de explosão fake em você.", Callback=functi
 -- Highlight vermelho toggle em todos os players
 local redHighlightEnabled = false
 
