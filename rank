@@ -1,0 +1,315 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "rank",
+   Icon = 0,
+   LoadingTitle = "Rayfield Interface Suite",
+   LoadingSubtitle = "by Sirius",
+   ShowText = "Rayfield",
+   Theme = "Default",
+   ToggleUIKeybind = "K",
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false,
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = nil,
+      FileName = "Big Hub"
+   },
+   Discord = {
+      Enabled = false,
+      Invite = "noinvitelink",
+      RememberJoins = true
+   },
+   KeySystem = false,
+   KeySettings = {
+      Title = "Untitled",
+      Subtitle = "Key System",
+      Note = "No method of obtaining the key is provided",
+      FileName = "Key",
+      SaveKey = true,
+      GrabKeyFromSite = false,
+      Key = {"Hello"}
+   }
+})
+
+local VisualTab = Window:CreateTab("Visual", 0)
+local Section = VisualTab:CreateSection("ESP/Highlights")
+
+-- Highlight vermelho toggle em todos os players
+local redHighlightEnabled = false
+
+function toggleRedHighlight(state)
+   redHighlightEnabled = state
+   for _,plr in pairs(game.Players:GetPlayers()) do
+      if plr ~= game.Players.LocalPlayer and plr.Character and plr.Character:FindFirstChildOfClass("Humanoid") then
+         local char = plr.Character
+         if char:FindFirstChild("RedHighlight") then
+            char.RedHighlight:Destroy()
+         end
+         if state then
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "RedHighlight"
+            highlight.FillColor = Color3.fromRGB(255, 0, 0)
+            highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+            highlight.FillTransparency = 0.5
+            highlight.OutlineTransparency = 0
+            highlight.Parent = char
+         end
+      end
+   end
+   Rayfield:Notify({
+      Title = "rank",
+      Content = state and "Highlight vermelho ativado em todos os players!" or "Highlight vermelho removido dos players.",
+      Duration = 3,
+      Image = 0,
+   })
+end
+
+VisualTab:CreateToggle({
+   Name = "Highlight Vermelho (Toggle)",
+   CurrentValue = false,
+   SectionParent = Section,
+   Callback = function(Value)
+      toggleRedHighlight(Value)
+   end
+})
+
+-- Atualizar highlight em novos players
+game.Players.PlayerAdded:Connect(function(plr)
+   plr.CharacterAdded:Connect(function()
+      if redHighlightEnabled then
+         task.wait(1)
+         if plr ~= game.Players.LocalPlayer and plr.Character and plr.Character:FindFirstChildOfClass("Humanoid") then
+            local char = plr.Character
+            if not char:FindFirstChild("RedHighlight") then
+               local highlight = Instance.new("Highlight")
+               highlight.Name = "RedHighlight"
+               highlight.FillColor = Color3.fromRGB(255, 0, 0)
+               highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+               highlight.FillTransparency = 0.5
+               highlight.OutlineTransparency = 0
+               highlight.Parent = char
+            end
+         end
+      end
+   end)
+end)
+
+-- Remover highlight de quem sair
+game.Players.PlayerRemoving:Connect(function(plr)
+   if plr.Character and plr.Character:FindFirstChild("RedHighlight") then
+      plr.Character.RedHighlight:Destroy()
+   end
+end)
+
+-- ESP Toggle
+local espEnabled = false
+local espDrawings = {}
+
+function createESP(plr)
+   if plr == game.Players.LocalPlayer then return end
+   if espDrawings[plr] then return end
+
+   local BillboardGui = Instance.new("BillboardGui")
+   BillboardGui.Name = "ESP_Billboard"
+   BillboardGui.Adornee = nil
+   BillboardGui.Size = UDim2.new(0, 200, 0, 60)
+   BillboardGui.StudsOffset = Vector3.new(0, 3, 0)
+   BillboardGui.AlwaysOnTop = true
+
+   local TextLabel = Instance.new("TextLabel", BillboardGui)
+   TextLabel.Size = UDim2.new(1, 0, 1, 0)
+   TextLabel.BackgroundTransparency = 1
+   TextLabel.TextColor3 = Color3.fromRGB(0,255,0)
+   TextLabel.TextStrokeTransparency = 0.5
+   TextLabel.Font = Enum.Font.SourceSansBold
+   TextLabel.TextSize = 16
+   TextLabel.Text = ""
+
+   espDrawings[plr] = {
+      BillboardGui = BillboardGui,
+      TextLabel = TextLabel
+   }
+
+   local function update()
+      if not espDrawings[plr] then return end
+      if plr.Character and plr.Character:FindFirstChild("Head") and plr.Character:FindFirstChildOfClass("Humanoid") then
+         BillboardGui.Adornee = plr.Character.Head
+         local humanoid = plr.Character:FindFirstChildOfClass("Humanoid")
+         local playerPos = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and game.Players.LocalPlayer.Character.HumanoidRootPart.Position or Vector3.new()
+         local charPos = plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character.HumanoidRootPart.Position or Vector3.new()
+         local dist = (playerPos - charPos).magnitude
+         TextLabel.Text = string.format(
+            "%s\nVida: %d\nDistância: %.1f",
+            plr.DisplayName or plr.Name,
+            math.floor(humanoid.Health),
+            dist
+         )
+         BillboardGui.Parent = game.CoreGui
+      else
+         BillboardGui.Parent = nil
+      end
+   end
+
+   espDrawings[plr].Connection = game:GetService("RunService").RenderStepped:Connect(update)
+end
+
+function removeESP(plr)
+   if espDrawings[plr] then
+      if espDrawings[plr].Connection then
+         espDrawings[plr].Connection:Disconnect()
+      end
+      if espDrawings[plr].BillboardGui then
+         espDrawings[plr].BillboardGui:Destroy()
+      end
+      espDrawings[plr] = nil
+   end
+end
+
+function toggleESP(state)
+   espEnabled = state
+   if state then
+      for _,plr in pairs(game.Players:GetPlayers()) do
+         createESP(plr)
+      end
+      Rayfield:Notify({
+         Title = "rank",
+         Content = "ESP ativado! Mostrando informações dos jogadores.",
+         Duration = 3,
+         Image = 0,
+      })
+   else
+      for _,esp in pairs(espDrawings) do
+         if esp.Connection then esp.Connection:Disconnect() end
+         if esp.BillboardGui then esp.BillboardGui:Destroy() end
+      end
+      espDrawings = {}
+      Rayfield:Notify({
+         Title = "rank",
+         Content = "ESP desativado!",
+         Duration = 3,
+         Image = 0,
+      })
+   end
+end
+
+VisualTab:CreateToggle({
+   Name = "ESP (Nome, Vida, Distância)",
+   CurrentValue = false,
+   SectionParent = Section,
+   Callback = function(Value)
+      toggleESP(Value)
+   end
+})
+
+-- Atualizar ESP ao entrar/sair jogador
+game.Players.PlayerAdded:Connect(function(plr)
+   if espEnabled then createESP(plr) end
+end)
+game.Players.PlayerRemoving:Connect(function(plr)
+   removeESP(plr)
+end)
+
+-- Variáveis para teletransporte
+local teleportLoopEnabled = false
+local teleportLoopPlayerName = ""
+local teleportLoopConnection
+
+-- Teletransporte para outro jogador por nome (botão único)
+VisualTab:CreateInput({
+   Name = "Teletransportar até player",
+   SectionParent = Section,
+   PlaceholderText = "Digite o nome do player",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(playerName)
+      local localChar = game.Players.LocalPlayer.Character
+      if not localChar or not localChar:FindFirstChild("HumanoidRootPart") then
+         Rayfield:Notify({
+            Title = "rank",
+            Content = "Seu personagem ainda não está pronto!",
+            Duration = 3,
+            Image = 0,
+         })
+         return
+      end
+      local found = false
+      for _,plr in pairs(game.Players:GetPlayers()) do
+         if plr ~= game.Players.LocalPlayer and (string.lower(plr.Name) == string.lower(playerName) or string.lower(plr.DisplayName or "") == string.lower(playerName)) then
+            if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+               localChar.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame
+               found = true
+               Rayfield:Notify({
+                  Title = "rank",
+                  Content = "Teletransportado para "..(plr.DisplayName or plr.Name).."!",
+                  Duration = 3,
+                  Image = 0,
+               })
+               break
+            end
+         end
+      end
+      if not found then
+         Rayfield:Notify({
+            Title = "rank",
+            Content = "Player não encontrado ou sem personagem!",
+            Duration = 3,
+            Image = 0,
+         })
+      end
+   end
+})
+
+-- Toggle de loop de teletransporte
+VisualTab:CreateToggle({
+   Name = "Loop Teletransporte para player",
+   CurrentValue = false,
+   SectionParent = Section,
+   Callback = function(Value)
+      teleportLoopEnabled = Value
+      if teleportLoopConnection then
+         teleportLoopConnection:Disconnect()
+         teleportLoopConnection = nil
+      end
+      if teleportLoopEnabled then
+         Rayfield:Notify({
+            Title = "rank",
+            Content = "Digite o nome do player na caixa acima para iniciar o loop.",
+            Duration = 3,
+            Image = 0,
+         })
+         -- Loop começa ao definir o nome na caixa acima
+         teleportLoopConnection = game:GetService("RunService").Heartbeat:Connect(function()
+            local playerName = teleportLoopPlayerName
+            if not playerName or playerName == "" then return end
+            local localChar = game.Players.LocalPlayer.Character
+            if localChar and localChar:FindFirstChild("HumanoidRootPart") then
+               for _,plr in pairs(game.Players:GetPlayers()) do
+                  if plr ~= game.Players.LocalPlayer and (string.lower(plr.Name) == string.lower(playerName) or string.lower(plr.DisplayName or "") == string.lower(playerName)) then
+                     if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                        localChar.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame
+                     end
+                  end
+               end
+            end
+         end)
+      else
+         Rayfield:Notify({
+            Title = "rank",
+            Content = "Loop de teletransporte desativado.",
+            Duration = 3,
+            Image = 0,
+         })
+      end
+   end
+})
+
+-- Capturar sempre o último valor digitado na caixa de input
+VisualTab:CreateInput({
+   Name = "Nome do player para Loop",
+   SectionParent = Section,
+   PlaceholderText = "Digite o nome do player para loop",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(playerName)
+      teleportLoopPlayerName = playerName
+   end
+})
